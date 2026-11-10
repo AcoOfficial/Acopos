@@ -28,6 +28,9 @@ function App() {
   const [authReady, setAuthReady] = useState(!supabaseConfigured);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [authMode, setAuthMode] = useState<"login"|"register">("login");
+  const [authMessage, setAuthMessage] = useState("");
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState("dashboard");
@@ -74,7 +77,7 @@ function App() {
 
   const pageTitle = titles[active] ?? "Dashboard";
     async function signIn(e: FormEvent) {
-    e.preventDefault(); setAuthError(""); setLoading(true);
+    e.preventDefault(); setAuthError(""); setAuthMessage(""); setLoading(true);
     if (!supabase) { setAuthError("Konfigurasi Supabase belum tersedia. Isi environment variables terlebih dahulu."); setLoading(false); return; }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setAuthError(error.message);
@@ -87,7 +90,7 @@ function App() {
 
   if (!session) return <main className="login-shell">
     <section className="login-brand"><div className="brand-lockup"><div className="brand-mark">a</div><span>aco<span>Pos</span></span></div><div className="login-copy"><div className="eyebrow">BUSINESS OPERATING PLATFORM</div><h1>Kelola bisnis.<br/><em>Lebih terarah.</em></h1><p>Satu workspace untuk penjualan, inventaris, tim, dan seluruh operasional bisnis Anda.</p></div><div className="login-foot">© 2026 acoPos · Business Workspace</div></section>
-    <section className="login-panel"><form className="login-card" onSubmit={signIn}><div className="mobile-brand"><div className="brand-mark">a</div><b>acoPos</b></div><div className="eyebrow">SELAMAT DATANG KEMBALI</div><h2>Masuk ke akun Anda</h2><p className="muted">Gunakan akun acoPos untuk melanjutkan.</p><label>Email</label><input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@perusahaan.com"/><label>Password</label><input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Masukkan password"/>{authError && <div className="error-note">{authError}</div>}<button className="primary-btn" disabled={loading}>{loading ? "Memproses…" : "Masuk"} <ArrowUpRight size={17}/></button><div className="login-help">Butuh bantuan? <a href="mailto:support@acopos.app">Hubungi Joeclyn</a></div></form></section>
+    <section className="login-panel"><form className="login-card" onSubmit={authMode==="login"?signIn:signUp}><div className="mobile-brand"><div className="brand-mark">a</div><b>acoPos</b></div><div className="eyebrow">{authMode==="login"?"SELAMAT DATANG KEMBALI":"MULAI MENGGUNAKAN ACOPOS"}</div><h2>{authMode==="login"?"Masuk ke akun Anda":"Daftar akun Owner"}</h2><p className="muted">{authMode==="login"?"Gunakan akun acoPos untuk melanjutkan.":"Buat akun terlebih dahulu. Aktivasi Company membutuhkan Kode Aktivasi dari Super Admin."}</p>{authMode==="register"&&<><label>Nama lengkap</label><input required value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Nama Anda"/></>}<label>Email</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="nama@perusahaan.com"/><label>Password</label><input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Minimal 8 karakter"/>{authError&&<div className="error-note">{authError}</div>}{authMessage&&<div className="notice-panel">{authMessage}</div>}<button className="primary-btn" disabled={loading}>{loading?"Memproses…":authMode==="login"?"Masuk":"Buat akun"} <ArrowUpRight size={17}/></button><div className="login-help">{authMode==="login"?"Belum punya akun?":"Sudah punya akun?"} <button type="button" className="text-btn" onClick={()=>{setAuthMode(authMode==="login"?"register":"login");setAuthError("");setAuthMessage("");}}>{authMode==="login"?"Daftar Owner":"Masuk"}</button></div><div className="login-help">Butuh bantuan? <a href="mailto:support@acopos.app">Hubungi Joeclyn</a></div></form></section>
   </main>;
 
   if (session && !roleReady) return <div className="boot-screen"><div className="brand-mark">a</div><span>Memeriksa hak akses…</span></div>;
