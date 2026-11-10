@@ -1,0 +1,14 @@
+create index if not exists customer_display_state_tenant_id_idx on public.customer_display_state(tenant_id);
+create index if not exists customer_display_state_updated_by_idx on public.customer_display_state(updated_by);
+create index if not exists platform_settings_updated_by_idx on public.platform_settings(updated_by);
+create index if not exists sales_transactions_customer_id_idx on public.sales_transactions(customer_id);
+create index if not exists subscription_payment_requests_company_id_idx on public.subscription_payment_requests(company_id);
+create index if not exists subscription_payment_requests_package_id_idx on public.subscription_payment_requests(package_id);
+create index if not exists subscription_payment_requests_requested_by_idx on public.subscription_payment_requests(requested_by);
+create index if not exists subscription_payment_requests_reviewed_by_idx on public.subscription_payment_requests(reviewed_by);
+create index if not exists support_conversations_assigned_to_idx on public.support_conversations(assigned_to);
+create index if not exists support_conversations_company_id_idx on public.support_conversations(company_id);
+create index if not exists support_conversations_created_by_idx on public.support_conversations(created_by);
+create index if not exists support_conversations_tenant_id_idx on public.support_conversations(tenant_id);
+create index if not exists support_messages_sender_id_idx on public.support_messages(sender_id);
+drop index if exists public.queue_tickets_tenant_number_unique;
