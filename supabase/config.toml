@@ -1,1 +1,4 @@
 project_id = "vxwjztlayceovovizvbu"
+
+[functions.acopos-display]
+verify_jwt = false
