@@ -76,6 +76,9 @@ Deno.serve(async (req) => {
     const safeState = {
       status: raw.status === "cart" || raw.status === "completed" ? raw.status : "idle",
       items,
+      subtotal: Math.max(0, Number(raw.subtotal) || 0),
+      discount_total: Math.max(0, Number(raw.discount_total) || 0),
+      tax_total: Math.max(0, Number(raw.tax_total) || 0),
       total: Math.max(0, Number(raw.total) || 0),
       order_note: typeof raw.order_note === "string" ? raw.order_note.slice(0, 240) : "",
       payment_method: typeof raw.payment_method === "string" ? raw.payment_method.slice(0, 30) : "",
@@ -84,6 +87,7 @@ Deno.serve(async (req) => {
     };
     return json({ tenant_name: tenant.name, state: safeState, server_time: now });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Internal server error" }, 400);
+    console.error("acopos-display error", error);
+    return json({ error: "Display service temporarily unavailable" }, 500);
   }
 });
