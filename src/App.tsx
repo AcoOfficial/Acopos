@@ -162,7 +162,7 @@ function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
     {label:"Akun profil",value:counts.admins,icon:Users},
     {label:"Paket berlangganan",value:counts.packages,icon:Wallet},
   ];
-  const navItems=["Ringkasan","Company","Tenant","Admin Platform","Paket & Langganan","Langganan Company","Kode Aktivasi","Audit Platform"];
+  const navItems=["Ringkasan","Company","Tenant","Admin Platform","Paket & Langganan","Langganan Company","Permintaan Pembayaran","Kode Aktivasi","Audit Platform"];
   const descriptions:Record<string,string>={
     Company:"Daftar Company pelanggan. Akses ini tidak membuka rincian transaksi pelanggan.",
     Tenant:"Daftar Tenant dan Company induknya.",
@@ -190,11 +190,11 @@ function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
         </>}
         {page==="Company"&&<PlatformTable table="companies" title="Company terdaftar" columns={["name","slug","status","owner_user_id","created_at"]}/>}
         {page==="Tenant"&&<PlatformTable table="tenants" title="Tenant terdaftar" columns={["name","slug","status","company_id","created_at"]}/>}
-        {page==="Admin Platform"&&<PlatformTable table="profiles" title="Akun Admin Platform" columns={["display_name","platform_role","account_status","created_at"]} filterAdmin/>}
+        {page==="Admin Platform"&&<PlatformAdminsManager/>}
         {page==="Paket & Langganan"&&<PackagesManager/>}
         {page==="Langganan Company"&&<PlatformTable table="company_subscriptions" title="Langganan Company" columns={["company_id","package_id","status","starts_at","ends_at","tenant_quota_snapshot"]}/>}
         {page==="Audit Platform"&&<PlatformTable table="audit_logs" title="Audit platform" columns={["action","entity_type","entity_id","actor_id","created_at"]}/>}
-        {page==="Kode Aktivasi"&&<section className="panel"><h3>Manajemen Kode Aktivasi</h3><p>Kode aktivasi disimpan dalam bentuk hash dan tidak dapat dibaca kembali. Pembuatan serta penukaran harus melalui fungsi server tepercaya; akses langsung dari browser sengaja ditutup.</p><div className="module-state"><ShieldCheck size={16}/> Endpoint aman penerbitan/penukaran kode masih perlu diselesaikan.</div></section>}
+        {page==="Permintaan Pembayaran"&&<PaymentRequestsManager/>}\n        {page==="Kode Aktivasi"&&<ActivationCodesManager/>}
         {error&&<div className="error-note">{error}</div>}
       </div>
     </main>
@@ -433,4 +433,27 @@ function AuditModule({tenantId}:{tenantId:string}) {
  const [rows,setRows]=useState<any[]>([]);
  useEffect(()=>{if(!supabase)return;void supabase.from("audit_logs").select("*").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200).then(({data})=>setRows(data??[]));},[tenantId]);
  return <section className="panel"><h3>Riwayat aktivitas</h3><div className="table-wrap"><table><thead><tr><th>Waktu</th><th>Aktor</th><th>Aksi</th><th>Entitas</th><th>ID</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{fmtDate(r.created_at)}</td><td>{r.actor_id??"Sistem"}</td><td>{r.action}</td><td>{r.entity_type}</td><td>{r.entity_id??"—"}</td></tr>)}{!rows.length&&<tr><td colSpan={5}>Belum ada aktivitas.</td></tr>}</tbody></table></div></section>;
+}
+
+
+function ActivationCodesManager() {
+ const [codes,setCodes]=useState<any[]>([]);const [expires,setExpires]=useState("");const [issued,setIssued]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ async function load(){if(!supabase)return;const {data,error}=await supabase.functions.invoke("acopos-admin",{body:{action:"list_activation_codes"}});if(error)setError(error.message);else if(data?.error)setError(data.error);else setCodes(data.codes??[]);}
+ useEffect(()=>{void load()},[]);
+ async function issue(){if(!supabase)return;setBusy(true);setError("");setIssued("");const {data,error}=await supabase.functions.invoke("acopos-admin",{body:{action:"create_activation_code",expires_at:expires?new Date(expires+"T23:59:59").toISOString():null}});if(error)setError(error.message);else if(data?.error)setError(data.error);else{setIssued(data.code);setExpires("");await load();}setBusy(false);}
+ return <div className="dashboard-grid"><section className="panel"><h3>Terbitkan Kode Aktivasi Owner</h3><p className="muted">Kode hanya untuk aktivasi akun Owner baru. Kode tidak mengaktifkan langganan Company.</p><label>Berlaku sampai (opsional)<input type="date" value={expires} onChange={e=>setExpires(e.target.value)}/></label><button className="primary-btn" disabled={busy} onClick={()=>void issue()}>{busy?"Menerbitkan…":"Terbitkan kode"}</button>{issued&&<div className="notice-panel"><div><b>Kode baru — salin sekarang</b><p className="activation-code">{issued}</p></div><button className="text-btn" onClick={()=>void navigator.clipboard.writeText(issued)}>Salin</button></div>}{error&&<div className="error-note">{error}</div>}</section><section className="panel"><div className="panel-heading"><div><h3>Riwayat kode aktivasi</h3><p>Nilai kode asli tidak disimpan dan tidak dapat ditampilkan ulang.</p></div><button className="icon-btn" onClick={()=>void load()}><RefreshCw size={16}/></button></div><div className="table-wrap"><table><thead><tr><th>Dibuat</th><th>Status</th><th>Kedaluwarsa</th><th>Digunakan oleh</th><th>Waktu penukaran</th></tr></thead><tbody>{codes.map(c=><tr key={c.id}><td>{fmtDate(c.created_at)}</td><td>{c.status}</td><td>{c.expires_at?fmtDate(c.expires_at):"Tidak ada"}</td><td>{c.redeemed_by??"—"}</td><td>{c.redeemed_at?fmtDate(c.redeemed_at):"—"}</td></tr>)}{!codes.length&&<tr><td colSpan={5}>Belum ada kode.</td></tr>}</tbody></table></div></section></div>;
+}
+
+function PlatformAdminsManager() {
+ const [email,setEmail]=useState("");const [enabled,setEnabled]=useState(true);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");const [error,setError]=useState("");
+ async function save(e:FormEvent){e.preventDefault();if(!supabase)return;setBusy(true);setError("");setMessage("");const {data,error}=await supabase.functions.invoke("acopos-admin",{body:{action:"set_platform_admin",email,enabled}});if(error)setError(error.message);else if(data?.error)setError(data.error);else{setMessage(email+" sekarang memiliki peran "+data.platform_role);setEmail("");}setBusy(false);}
+ return <div className="dashboard-grid"><section className="panel"><h3>Kelola Admin Platform</h3><p className="muted">Hanya akun yang sudah terdaftar dapat diberi peran Admin Platform. Admin Platform tidak otomatis memperoleh akses transaksi pelanggan.</p><form className="form-grid" onSubmit={save}><label>Email akun<input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Tindakan<select value={enabled?"enable":"disable"} onChange={e=>setEnabled(e.target.value==="enable")}><option value="enable">Jadikan Admin Platform</option><option value="disable">Cabut peran Admin Platform</option></select></label><button className="primary-btn" disabled={busy}>{busy?"Menyimpan…":"Simpan peran"}</button></form>{error&&<div className="error-note">{error}</div>}{message&&<div className="notice-panel">{message}</div>}</section><PlatformTable table="profiles" title="Daftar Admin Platform" columns={["display_name","platform_role","account_status","created_at"]} filterAdmin/></div>;
+}
+
+function PaymentRequestsManager() {
+ const [rows,setRows]=useState<any[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [message,setMessage]=useState("");
+ async function load(){if(!supabase)return;const {data,error}=await supabase.from("subscription_payment_requests").select("*,companies(name),packages(name,duration_days,tenant_quota)").order("created_at",{ascending:false}).limit(100);if(error)setError(error.message);setRows(data??[]);}
+ useEffect(()=>{void load()},[]);
+ async function review(row:any,decision:"approved"|"rejected"){if(!supabase)return;setBusy(true);setError("");setMessage("");const {data,error}=await supabase.functions.invoke("acopos-admin",{body:{action:"review_payment",request_id:row.id,decision}});if(error)setError(error.message);else if(data?.error)setError(data.error);else{setMessage("Permintaan "+row.id+" "+(decision==="approved"?"disetujui dan langganan diaktifkan.":"ditolak."));await load();}setBusy(false);}
+ return <section className="panel"><div className="panel-heading"><div><h3>Permintaan pembayaran Company</h3><p>Verifikasi manual. Persetujuan mengaktifkan langganan Company sesuai paket.</p></div><button className="icon-btn" onClick={()=>void load()}><RefreshCw size={16}/></button></div>{error&&<div className="error-note">{error}</div>}{message&&<div className="notice-panel">{message}</div>}<div className="table-wrap"><table><thead><tr><th>Company</th><th>Paket</th><th>Nominal</th><th>Metode</th><th>Referensi</th><th>Status</th><th>Tanggal</th><th>Aksi</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.companies?.name??r.company_id}</td><td>{r.packages?.name??r.package_id}</td><td>{money(Number(r.amount))}</td><td>{r.payment_method}</td><td>{r.payment_reference??"—"}</td><td>{r.status}</td><td>{fmtDate(r.created_at)}</td><td>{r.status==="pending"?<div className="table-actions"><button className="text-btn" disabled={busy} onClick={()=>void review(r,"approved")}>Setujui</button><button className="text-btn" disabled={busy} onClick={()=>void review(r,"rejected")}>Tolak</button></div>:"Selesai"}</td></tr>)}{!rows.length&&<tr><td colSpan={8}>Belum ada permintaan pembayaran.</td></tr>}</tbody></table></div></section>;
 }
