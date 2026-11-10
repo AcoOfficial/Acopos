@@ -22,6 +22,7 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL")!;
   const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
   const action = String(body.action ?? "");
@@ -37,7 +38,6 @@ Deno.serve(async (req) => {
   if (!authorization.startsWith("Bearer ")) return json({ error: "Authentication required" }, 401);
 
   const userClient = createClient(url, anon, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } });
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: userData, error: authError } = await userClient.auth.getUser();
   if (authError || !userData.user) return json({ error: "Invalid session" }, 401);
   const actor = userData.user;
