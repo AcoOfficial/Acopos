@@ -111,7 +111,7 @@ function App() {
 
   if (session && !roleReady) return <div className="boot-screen"><div className="brand-mark">a</div><span>Memeriksa hak akses…</span></div>;
   if (session && accountStatus !== "active") return <main className="login-shell"><section className="login-panel"><div className="login-card"><div className="eyebrow">AKUN DINONAKTIFKAN</div><h2>Akses akun dibatasi</h2><p className="muted">Akun ini tidak memiliki akses operasional saat ini. Hubungi Super Admin atau Joeclyn Support.</p><button className="primary-btn" onClick={signOut}>Keluar</button></div></section></main>;
-  if (session && platformRole === "super_admin") return <SuperAdminHome email={session.user.email ?? ""} onSignOut={signOut} />;
+  if (session && platformRole === "super_admin") return <SuperAdminHome email={session.user.email ?? ""} userId={session.user.id} onSignOut={signOut} />;
   if (session && platformRole === "admin_platform") return <AdminPlatformHome email={session.user.email ?? ""} onSignOut={signOut} />;
   const queueDisplayTenantId = new URLSearchParams(window.location.search).get("queue-display");
   if (session && queueDisplayTenantId) return <QueueDisplayScreen tenantId={queueDisplayTenantId}/>;
@@ -163,7 +163,7 @@ function ModulePage({id,title,userId,tenantId,onRefreshTenants}:{id:string;title
 
 export default App;
 
-function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
+function SuperAdminHome({email,userId,onSignOut}:{email:string;userId:string;onSignOut:()=>void}) {
   const [page,setPage]=useState("Ringkasan");
   const [counts,setCounts]=useState({companies:0,tenants:0,admins:0,packages:0});
   const [loading,setLoading]=useState(true);
@@ -220,7 +220,7 @@ function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
         {page==="Langganan Company"&&<PlatformTable table="company_subscriptions" title="Langganan Company" columns={["company_id","package_id","status","starts_at","ends_at","tenant_quota_snapshot"]}/>}
         {page==="Audit Platform"&&<PlatformTable table="audit_logs" title="Audit platform" columns={["action","entity_type","entity_id","actor_id","created_at"]}/>}
         {page==="Joeclyn Live Chat"&&<SupportInbox/>}
-        {page==="Pengaturan Platform"&&<PlatformSettingsManager userId={session.user.id}/>}
+        {page==="Pengaturan Platform"&&<PlatformSettingsManager userId={userId}/>}
         {page==="Permintaan Pembayaran"&&<PaymentRequestsManager/>}
         {page==="Kode Aktivasi"&&<ActivationCodesManager/>}
         {error&&<div className="error-note">{error}</div>}
@@ -283,6 +283,9 @@ type AttendanceRow = {id:string;tenant_id:string;employee_id:string;source:strin
 function AttendanceModule({userId,report}:{userId:string;report:boolean}) {
   const [tenants,setTenants] = useState<TenantOption[]>([]);
   const [tenantId,setTenantId] = useState("");
+  const today = new Date().toISOString().slice(0,10);
+  const [from,setFrom] = useState(today.slice(0,8)+"01");
+  const [to,setTo] = useState(today);
   const [rows,setRows] = useState<AttendanceRow[]>([]);
   const [loading,setLoading] = useState(true);
   const [busy,setBusy] = useState(false);
