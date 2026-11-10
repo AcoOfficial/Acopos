@@ -56,7 +56,8 @@ function App() {
       setRoleReady(false);
       const { data, error } = await supabase.from("profiles").select("platform_role,account_status").eq("id", session.user.id).maybeSingle();
       if (!alive) return;
-      setPlatformRole(error ? null : (data?.platform_role ?? "none"));
+      setPlatformRole(error || !data ? null : (data.platform_role ?? "none"));
+      setAccountStatus(error || !data ? "inactive" : (data.account_status ?? "inactive"));
       setRoleReady(true);
     }
     void loadRole();
