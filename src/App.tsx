@@ -41,6 +41,9 @@ function App() {
   const [roleReady, setRoleReady] = useState(false);
   const [tenantOptions, setTenantOptions] = useState<{id:string;name:string;company_id:string;status:string}[]>([]);
   const [activeTenantId, setActiveTenantId] = useState("");
+  const [tenantPermissions, setTenantPermissions] = useState<string[]>([]);
+  const [companyOwner, setCompanyOwner] = useState(false);
+  const [accessReady, setAccessReady] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -77,6 +80,80 @@ function App() {
     void loadTenants();
     return () => { alive = false; };
   }, [session, active, activeTenantId]);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadTenantAccess() {
+      if (!session || !supabase) {
+        setTenantPermissions([]);
+        setCompanyOwner(false);
+        setAccessReady(true);
+        return;
+      }
+      setAccessReady(false);
+      if (!activeTenantId) {
+        const { data } = await supabase.from("companies").select("id").eq("owner_user_id", session.user.id).limit(1);
+        if (alive) {
+          setCompanyOwner(Boolean(data?.length));
+          setTenantPermissions([]);
+          setAccessReady(true);
+        }
+        return;
+      }
+      const { data: tenant } = await supabase.from("tenants").select("company_id").eq("id", activeTenantId).maybeSingle();
+      let isOwner = false;
+      if (tenant?.company_id) {
+        const { data: company } = await supabase.from("companies").select("owner_user_id").eq("id", tenant.company_id).maybeSingle();
+        isOwner = company?.owner_user_id === session.user.id;
+      }
+      if (isOwner) {
+        if (alive) {
+          setCompanyOwner(true);
+          setTenantPermissions(["pos.use","products.manage","inventory.manage","cashier.open","cashier.manage","queue.manage","self_order.manage","attendance.use","attendance.view","attendance.correct","employees.manage","settings.manage","customers.manage","audit.view","transactions.view","reports.view"]);
+          setAccessReady(true);
+        }
+        return;
+      }
+      const [{ data: member }, { data: grants }] = await Promise.all([
+        supabase.from("tenant_members").select("is_active").eq("tenant_id", activeTenantId).eq("user_id", session.user.id).maybeSingle(),
+        supabase.from("tenant_member_permissions").select("permission_key").eq("tenant_id", activeTenantId).eq("user_id", session.user.id).eq("granted", true),
+      ]);
+      if (alive) {
+        setCompanyOwner(false);
+        setTenantPermissions(member?.is_active ? (grants ?? []).map((item: any) => item.permission_key) : []);
+        setAccessReady(true);
+      }
+    }
+    void loadTenantAccess();
+    return () => { alive = false; };
+  }, [session, activeTenantId]);
+
+  const canSeeModule = (id: string) => {
+    const has = (...keys: string[]) => companyOwner || keys.some(key => tenantPermissions.includes(key));
+    if (id === "dashboard" || id === "help") return true;
+    if (id === "company") return companyOwner;
+    if (id === "pos") return has("pos.use");
+    if (id === "display") return has("settings.manage");
+    if (id === "transactions") return has("transactions.view","pos.use","reports.view");
+    if (id === "customers") return has("customers.manage");
+    if (id === "products") return has("products.manage","pos.use");
+    if (id === "inventory") return has("inventory.manage");
+    if (id === "cashier") return has("cashier.open","cashier.manage","pos.use","reports.view");
+    if (id === "queue") return has("queue.manage");
+    if (id === "self-order") return has("self_order.manage");
+    if (id === "employees") return has("employees.manage");
+    if (id === "attendance") return has("attendance.use","attendance.view");
+    if (id === "attendance-report") return has("attendance.view");
+    if (id === "finance") return has("reports.view");
+    if (id === "audit") return has("audit.view");
+    if (id === "settings") return has("settings.manage");
+    return false;
+  };
+  const visibleNav = nav.map(group => ({ ...group, items: group.items.filter(item => canSeeModule(item.id)) })).filter(group => group.items.length);
+  const activeAllowed = canSeeModule(active);
+  useEffect(() => {
+    if (session && accessReady && !activeAllowed) setActive("dashboard");
+  }, [session, accessReady, activeAllowed]);
 
   const pageTitle = titles[active] ?? "Dashboard";
     async function signIn(e: FormEvent) {
@@ -123,7 +200,7 @@ function App() {
     <aside className={`sidebar ${mobileOpen ? "sidebar-open" : ""}`}>
       <div className="brand-lockup side-brand"><div className="brand-mark">a</div><span>aco<span>Pos</span></span><button className="icon-btn mobile-close" onClick={() => setMobileOpen(false)}><X size={18}/></button></div>
       <div className="workspace-switch"><div className="workspace-icon"><Store size={18}/></div><div><b>Workspace</b><small>Tenant aktif</small></div><ChevronDown size={15}/></div>
-      <nav className="side-nav">{nav.map(group => <div className="nav-group" key={group.group}><div className="nav-label">{group.group}</div>{group.items.map(item => <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => { setActive(item.id); setMobileOpen(false); }}><item.icon size={18} strokeWidth={1.8}/><span>{item.label}</span></button>)}</div>)}</nav>
+      <nav className="side-nav">{visibleNav.map(group => <div className="nav-group" key={group.group}><div className="nav-label">{group.group}</div>{group.items.map(item => <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => { setActive(item.id); setMobileOpen(false); }}><item.icon size={18} strokeWidth={1.8}/><span>{item.label}</span></button>)}</div>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><b>Perlu bantuan?</b><small>Joeclyn siap membantu</small></div><ArrowUpRight size={15}/></div><button className="profile-row" onClick={signOut}><div className="avatar">{(session.user.email ?? "U").slice(0,1).toUpperCase()}</div><div className="profile-text"><b>{session.user.email}</b><small>Keluar dari akun</small></div><LogOut size={16}/></button></div>
     </aside>
     <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-btn menu-toggle" onClick={() => setMobileOpen(true)}><Menu size={20}/></button><div className="breadcrumbs">Workspace <span>/</span> <b>{pageTitle}</b></div></div><div className="topbar-actions">{tenantOptions.length > 0 && <select aria-label="Tenant aktif" className="tenant-picker" value={activeTenantId} onChange={e => setActiveTenantId(e.target.value)}>{tenantOptions.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}<div className="search-box"><Search size={16}/><input placeholder="Cari menu atau data…"/></div><button className="icon-btn notification-btn"><Bell size={18}/><i/></button><div className="top-avatar">{(session.user.email ?? "U").slice(0,1).toUpperCase()}</div></div></header>
@@ -439,7 +516,7 @@ function FinanceModule({tenantId}:{tenantId:string}) {
 }
 function EmployeesModule({tenantId}:{tenantId:string}) {
  const [members,setMembers]=useState<any[]>([]);const [company,setCompany]=useState<any>(null);const [email,setEmail]=useState("");const [name,setName]=useState("");const [role,setRole]=useState("employee");const [job,setJob]=useState("");const [permissions,setPermissions]=useState<string[]>(["pos.use"]);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [message,setMessage]=useState("");
- const permissionOptions=["pos.use","products.manage","inventory.manage","cashier.open","cashier.manage","queue.manage","self_order.manage","attendance.use","attendance.view","attendance.correct","employees.manage","settings.manage","customers.manage","audit.view"];
+ const permissionOptions=["pos.use","transactions.view","reports.view","products.manage","inventory.manage","cashier.open","cashier.manage","queue.manage","self_order.manage","attendance.use","attendance.view","attendance.correct","employees.manage","settings.manage","customers.manage","audit.view"];
  async function load(){if(!supabase)return;const [m,t]=await Promise.all([supabase.from("tenant_members").select("*,profiles(display_name)").eq("tenant_id",tenantId).order("created_at"),supabase.from("tenants").select("company_id").eq("id",tenantId).single()]);setMembers(m.data??[]);if(t.data){const {data}=await supabase.from("companies").select("id,name").eq("id",t.data.company_id).single();setCompany(data);}}
  useEffect(()=>{void load()},[tenantId]);
  async function invite(e:FormEvent){e.preventDefault();if(!supabase||!company)return;setBusy(true);setError("");setMessage("");const {data,error}=await supabase.functions.invoke("acopos-admin",{body:{action:"invite_tenant_member",email,display_name:name,company_id:company.id,tenant_id:tenantId,role,job_title:job,permissions}});if(error)setError(error.message);else if(data?.error)setError(data.error);else{setMessage("Undangan diproses. Jika akun baru, undangan email sudah dikirim.");setEmail("");setName("");await load();}setBusy(false);}
