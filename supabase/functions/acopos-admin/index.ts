@@ -118,24 +118,14 @@ Deno.serve(async (req) => {
     if (action === "review_payment") {
       if (profile.platform_role !== "super_admin" && profile.platform_role !== "admin_platform") return json({ error: "Admin Platform only" }, 403);
       const { request_id, decision, review_note } = body;
-      if (!["approved", "rejected"].includes(decision)) return json({ error: "Keputusan tidak valid" }, 400);
-      const { data: request, error: requestError } = await admin.from("subscription_payment_requests").select("id,company_id,package_id,amount,status").eq("id", request_id).single();
-      if (requestError || !request || request.status !== "pending") return json({ error: "Permintaan pembayaran tidak ditemukan atau sudah diproses" }, 404);
-      const { data: pkg, error: pkgError } = await admin.from("packages").select("id,duration_days,tenant_quota,is_active").eq("id", request.package_id).single();
-      if (pkgError || !pkg?.is_active) return json({ error: "Paket sudah tidak aktif" }, 400);
-      const reviewedAt = new Date();
-      const { error: updateError } = await admin.from("subscription_payment_requests").update({ status: decision, reviewed_by: actor.id, reviewed_at: reviewedAt.toISOString(), review_note: review_note ?? null }).eq("id", request.id).eq("status", "pending");
-      if (updateError) throw updateError;
-      if (decision === "approved") {
-        const starts = reviewedAt;
-        const ends = new Date(starts.getTime() + pkg.duration_days * 86400000);
-        const payload = { company_id: request.company_id, package_id: pkg.id, status: "active", starts_at: starts.toISOString(), ends_at: ends.toISOString(), tenant_quota_snapshot: pkg.tenant_quota, updated_at: starts.toISOString() };
-        const { data: existing } = await admin.from("company_subscriptions").select("id").eq("company_id", request.company_id).maybeSingle();
-        const result = existing ? await admin.from("company_subscriptions").update(payload).eq("id", existing.id).select("id").single() : await admin.from("company_subscriptions").insert(payload).select("id").single();
-        if (result.error) throw result.error;
-      }
-      await admin.from("audit_logs").insert({ company_id: request.company_id, actor_id: actor.id, action: "subscription.payment_" + decision, entity_type: "subscription_payment_request", entity_id: request.id, after_data: { decision, review_note: review_note ?? null } });
-      return json({ request_id: request.id, status: decision });
+      const { data, error } = await admin.rpc("review_subscription_payment", {
+        p_request_id: request_id,
+        p_decision: decision,
+        p_actor_id: actor.id,
+        p_note: review_note ?? null,
+      });
+      if (error) throw error;
+      return json(data);
     }
 
     if (action === "set_platform_admin") {
