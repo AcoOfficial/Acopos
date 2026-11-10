@@ -91,6 +91,8 @@ function App() {
         return;
       }
       setAccessReady(false);
+      setTenantPermissions([]);
+      setCompanyOwner(false);
       if (!activeTenantId) {
         const { data } = await supabase.from("companies").select("id").eq("owner_user_id", session.user.id).limit(1);
         if (alive) {
