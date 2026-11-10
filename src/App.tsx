@@ -194,7 +194,8 @@ function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
         {page==="Paket & Langganan"&&<PackagesManager/>}
         {page==="Langganan Company"&&<PlatformTable table="company_subscriptions" title="Langganan Company" columns={["company_id","package_id","status","starts_at","ends_at","tenant_quota_snapshot"]}/>}
         {page==="Audit Platform"&&<PlatformTable table="audit_logs" title="Audit platform" columns={["action","entity_type","entity_id","actor_id","created_at"]}/>}
-        {page==="Permintaan Pembayaran"&&<PaymentRequestsManager/>}\n        {page==="Kode Aktivasi"&&<ActivationCodesManager/>}
+        {page==="Permintaan Pembayaran"&&<PaymentRequestsManager/>}
+        {page==="Kode Aktivasi"&&<ActivationCodesManager/>}
         {error&&<div className="error-note">{error}</div>}
       </div>
     </main>
