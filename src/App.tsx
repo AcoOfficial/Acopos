@@ -31,6 +31,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [platformRole, setPlatformRole] = useState<string | null>(null);
+  const [roleReady, setRoleReady] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -38,6 +40,20 @@ function App() {
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadRole() {
+      if (!session || !supabase) { setPlatformRole(null); setRoleReady(true); return; }
+      setRoleReady(false);
+      const { data, error } = await supabase.from("profiles").select("platform_role").eq("id", session.user.id).maybeSingle();
+      if (!alive) return;
+      setPlatformRole(error ? null : (data?.platform_role ?? "none"));
+      setRoleReady(true);
+    }
+    void loadRole();
+    return () => { alive = false; };
+  }, [session]);
 
   const pageTitle = titles[active] ?? "Dashboard";
     async function signIn(e: FormEvent) {
@@ -56,6 +72,9 @@ function App() {
     <section className="login-brand"><div className="brand-lockup"><div className="brand-mark">a</div><span>aco<span>Pos</span></span></div><div className="login-copy"><div className="eyebrow">BUSINESS OPERATING PLATFORM</div><h1>Kelola bisnis.<br/><em>Lebih terarah.</em></h1><p>Satu workspace untuk penjualan, inventaris, tim, dan seluruh operasional bisnis Anda.</p></div><div className="login-foot">© 2026 acoPos · Business Workspace</div></section>
     <section className="login-panel"><form className="login-card" onSubmit={signIn}><div className="mobile-brand"><div className="brand-mark">a</div><b>acoPos</b></div><div className="eyebrow">SELAMAT DATANG KEMBALI</div><h2>Masuk ke akun Anda</h2><p className="muted">Gunakan akun acoPos untuk melanjutkan.</p><label>Email</label><input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="nama@perusahaan.com"/><label>Password</label><input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Masukkan password"/>{authError && <div className="error-note">{authError}</div>}<button className="primary-btn" disabled={loading}>{loading ? "Memproses…" : "Masuk"} <ArrowUpRight size={17}/></button><div className="login-help">Butuh bantuan? <a href="mailto:support@acopos.app">Hubungi Joeclyn</a></div></form></section>
   </main>;
+
+  if (session && !roleReady) return <div className="boot-screen"><div className="brand-mark">a</div><span>Memeriksa hak akses…</span></div>;
+  if (session && platformRole === "super_admin") return <SuperAdminHome email={session.user.email ?? ""} onSignOut={signOut} />;
 
   return <div className="app-shell">
     {mobileOpen && <button className="scrim" aria-label="Tutup menu" onClick={() => setMobileOpen(false)} />}
@@ -84,3 +103,61 @@ function ModulePage({id,title}:{id:string;title:string}) {
 }
 
 export default App;
+
+function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
+  const [counts,setCounts] = useState({companies:0,tenants:0,admins:0,packages:0});
+  const [loading,setLoading] = useState(true);
+  const [error,setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      if (!supabase) return;
+      setLoading(true); setError("");
+      const tables = ["companies","tenants","profiles","packages"] as const;
+      const results = await Promise.all(tables.map(table => supabase!.from(table).select("*",{count:"exact",head:true})));
+      if (!alive) return;
+      const failed = results.find(r => r.error);
+      if (failed?.error) setError("Sebagian ringkasan belum dapat dibaca. Periksa kebijakan akses database.");
+      setCounts({companies:results[0].count ?? 0,tenants:results[1].count ?? 0,admins:results[2].count ?? 0,packages:results[3].count ?? 0});
+      setLoading(false);
+    }
+    void load();
+    return () => { alive = false; };
+  },[]);
+  const cards = [
+    {label:"Company terdaftar",value:counts.companies,icon:Building2},
+    {label:"Tenant terdaftar",value:counts.tenants,icon:Store},
+    {label:"Akun profil",value:counts.admins,icon:Users},
+    {label:"Paket berlangganan",value:counts.packages,icon:Wallet},
+  ];
+  const areas = [
+    ["Manajemen Company","Pantau perusahaan pelanggan, status akun, dan pemilik Company."],
+    ["Manajemen Tenant","Lihat seluruh Tenant dan relasinya dengan Company."],
+    ["Admin Platform","Kelola administrator platform dan ruang kewenangannya."],
+    ["Paket & Langganan","Atur paket, harga, kuota Tenant, dan masa berlangganan."],
+    ["Kode Aktivasi","Kelola kode aktivasi untuk pendaftaran Owner."],
+    ["Audit Platform","Telusuri perubahan konfigurasi dan aktivitas penting."],
+  ];
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <div className="brand-lockup side-brand"><div className="brand-mark">a</div><span>aco<span>Pos</span></span></div>
+      <div className="workspace-switch"><div className="workspace-icon"><ShieldCheck size={18}/></div><div><b>Platform Control</b><small>Super Admin</small></div></div>
+      <nav className="side-nav">
+        <div className="nav-group"><div className="nav-label">PENGELOLAAN PLATFORM</div>
+          {["Ringkasan","Company","Tenant","Admin Platform","Paket & Langganan","Kode Aktivasi","Audit Platform"].map((item,i)=><div className={i===0?"nav-item active":"nav-item"} key={item}><span>{item}</span></div>)}
+        </div>
+      </nav>
+      <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><b>Joeclyn Support</b><small>Bantuan platform</small></div></div><button className="profile-row" onClick={onSignOut}><div className="avatar">{email.slice(0,1).toUpperCase()}</div><div className="profile-text"><b>{email}</b><small>Keluar dari akun</small></div><LogOut size={16}/></button></div>
+    </aside>
+    <main className="main-area">
+      <header className="topbar"><div className="breadcrumbs">Platform Control <span>/</span> <b>Ringkasan</b></div><div className="topbar-actions"><span className="eyebrow">SUPER ADMIN</span><div className="top-avatar">{email.slice(0,1).toUpperCase()}</div></div></header>
+      <div className="page-content">
+        <div className="page-heading"><div><div className="eyebrow">PUSAT KENDALI ACOPOS</div><h1>Platform Overview</h1><p>Pengelolaan ekosistem Company, Tenant, akun, dan langganan acoPos.</p></div><span className="module-state"><ShieldCheck size={16}/> Akses Super Admin</span></div>
+        <div className="stats-grid">{cards.map(card=><article className="stat-card" key={card.label}><div className="stat-top"><span>{card.label}</span><div className="stat-icon"><card.icon size={18}/></div></div><strong>{loading?"…":card.value.toLocaleString("id-ID")}</strong><small>Data database saat ini</small></article>)}</div>
+        {error&&<div className="error-note">{error}</div>}
+        <section className="panel"><div className="panel-heading"><div><h3>Area kendali platform</h3><p>Modul administrasi tingkat platform</p></div></div><div className="stats-grid">{areas.map(([title,description])=><article className="stat-card" key={title}><strong style={{fontSize:16}}>{title}</strong><small>{description}</small></article>)}</div></section>
+        <div className="notice-panel"><div className="notice-icon"><ShieldCheck size={19}/></div><div><b>Anda masuk sebagai Super Admin</b><p>Panel ini terpisah dari Workspace Tenant. Pengelolaan lintas Company hanya tersedia melalui kewenangan platform dan tetap dicatat pada audit log.</p></div><CheckCircle2 size={18}/></div>
+      </div>
+    </main>
+  </div>;
+}
