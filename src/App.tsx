@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, BarChart3, Bell, Building2, CalendarCheck,
-  CheckCircle2, ChevronDown, CircleHelp, Clock3, CreditCard, FileClock, LayoutDashboard,
+  Activity, ArrowUpRight, BarChart3, Bell, Building2, CalendarCheck,
+  CheckCircle2, ChevronDown, CircleHelp, Clock3, FileClock, LayoutDashboard,
   LogOut, Menu, Monitor, Package, Plus, QrCode, ReceiptText, Search, Settings, ShieldCheck,
   ShoppingBag, Store, Users, Wallet, Warehouse, X,
 } from "lucide-react";
@@ -39,9 +40,7 @@ function App() {
   }, []);
 
   const pageTitle = titles[active] ?? "Dashboard";
-  const navItems = useMemo(() => nav.flatMap(g => g.items), []);
-
-  async function signIn(e: React.FormEvent) {
+    async function signIn(e: FormEvent) {
     e.preventDefault(); setAuthError(""); setLoading(true);
     if (!supabase) { setAuthError("Konfigurasi Supabase belum tersedia. Isi environment variables terlebih dahulu."); setLoading(false); return; }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
