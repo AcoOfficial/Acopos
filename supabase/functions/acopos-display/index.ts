@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const tokenHash = await sha256(token);
     const { data: device, error: deviceError } = await admin
       .from("customer_display_devices")
-      .select("id,tenant_id,register_id,is_active")
+      .select("id,tenant_id,register_id,is_active,last_seen_at")
       .eq("pairing_token_hash", tokenHash)
       .eq("is_active", true)
       .maybeSingle();
@@ -61,7 +61,9 @@ Deno.serve(async (req) => {
 
     const [{ data: stateRow, error: stateError }, { error: seenError }] = await Promise.all([
       admin.from("customer_display_state").select("state").eq("register_id", device.register_id).eq("tenant_id", device.tenant_id).maybeSingle(),
-      admin.from("customer_display_devices").update({ last_seen_at: now }).eq("id", device.id),
+      device.last_seen_at && Date.now() - new Date(device.last_seen_at).getTime() < 60_000
+        ? Promise.resolve({ error: null })
+        : admin.from("customer_display_devices").update({ last_seen_at: now }).eq("id", device.id),
     ]);
     if (stateError) throw stateError;
     if (seenError) throw seenError;
