@@ -22,6 +22,17 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL")!;
   const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
+  const action = String(body.action ?? "");
+  if (action === "validate_owner_activation_code") {
+    const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+    if (!/^ACO-[A-F0-9]{12}$/.test(code)) return json({ valid: false, error: "Format kode aktivasi tidak valid." });
+    const { data, error } = await admin.from("activation_codes").select("id,expires_at").eq("code_hash", await sha256(code)).eq("status", "available").maybeSingle();
+    if (error) return json({ valid: false, error: "Kode aktivasi belum dapat diverifikasi. Silakan coba kembali." });
+    if (!data || (data.expires_at && new Date(data.expires_at).getTime() <= Date.now())) return json({ valid: false, error: "Kode aktivasi tidak valid, kedaluwarsa, atau sudah digunakan." });
+    return json({ valid: true });
+  }
   const authorization = req.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ")) return json({ error: "Authentication required" }, 401);
 
@@ -34,8 +45,7 @@ Deno.serve(async (req) => {
   if (!profile || profile.account_status !== "active") return json({ error: "Account is inactive" }, 403);
 
   try {
-    const body = await req.json();
-    const action = String(body.action ?? "");
+
 
     if (action === "list_activation_codes") {
       if (profile.platform_role !== "super_admin") return json({ error: "Super Admin only" }, 403);
