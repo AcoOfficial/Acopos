@@ -179,8 +179,12 @@ function App() {
       return;
     }
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName } } });
-    if (error) setAuthError(error.message);
-    else {
+    if (error) {
+      const authError = error as any;
+      setAuthError(authError.status === 429 || authError.code === "over_email_send_rate_limit" || /email rate limit exceeded/i.test(error.message)
+        ? "Batas pengiriman email verifikasi Supabase sudah tercapai. Jangan ulangi pendaftaran dulu. Tunggu hingga batas email pulih, atau hubungi Admin untuk mengaktifkan SMTP email acoPos. Jika akun sudah terbentuk, silakan masuk dan gunakan menu Aktivasi Owner."
+        : error.message);
+    } else {
       try { sessionStorage.setItem("acopos_owner_activation_code", normalizedCode); } catch {}
       if (data.session) setSession(data.session);
       else setAuthMessage("Pendaftaran berhasil. Verifikasi email Anda. Kode aktivasi sudah disiapkan dan akan digunakan saat Anda masuk untuk menyelesaikan aktivasi Company.");
