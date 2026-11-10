@@ -8,6 +8,7 @@ import {
   ShoppingBag, Store, Users, Wallet, Warehouse, X, ShoppingCart, Trash2, UserPlus, PackagePlus, RefreshCw, Tag, Printer, TrendingUp,
 } from "lucide-react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
+import { QRCodeSVG } from "qrcode.react";
 
 const nav = [
   { group: "UTAMA", items: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }] },
