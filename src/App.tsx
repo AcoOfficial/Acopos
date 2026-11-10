@@ -84,6 +84,16 @@ function App() {
     setLoading(false);
   }
 
+  async function signUp(e: FormEvent) {
+    e.preventDefault(); setAuthError(""); setAuthMessage(""); setLoading(true);
+    if (!supabase) { setAuthError("Konfigurasi Supabase belum tersedia."); setLoading(false); return; }
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName } } });
+    if (error) setAuthError(error.message);
+    else if (data.session) setSession(data.session);
+    else setAuthMessage("Pendaftaran berhasil. Periksa email untuk verifikasi, lalu masuk dan buka Pusat Perusahaan untuk memasukkan Kode Aktivasi Owner.");
+    setLoading(false);
+  }
+
   async function signOut() { await supabase?.auth.signOut(); setSession(null); }
 
   if (!authReady) return <div className="boot-screen"><div className="brand-mark">a</div><span>Menyiapkan acoPos…</span></div>;
