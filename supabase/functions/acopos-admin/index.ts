@@ -73,8 +73,12 @@ Deno.serve(async (req) => {
     if (action === "invite_tenant_member") {
       const { email, display_name, company_id, tenant_id, role, job_title, permissions = [] } = body;
       if (!email || !company_id || !tenant_id || !["manager", "employee"].includes(role)) return json({ error: "Data undangan tidak lengkap" }, 400);
-      const { data: company } = await admin.from("companies").select("id,owner_user_id").eq("id", company_id).single();
+      const { data: company } = await admin.from("companies").select("id,owner_user_id,status").eq("id", company_id).single();
       const isOwner = company?.owner_user_id === actor.id;
+      const { data: tenantStatus } = await admin.from("tenants").select("id,company_id,status").eq("id", tenant_id).single();
+      if (!company || company.status !== "active" || !tenantStatus || tenantStatus.company_id !== company_id || tenantStatus.status !== "active") return json({ error: "Company atau Tenant tidak aktif" }, 403);
+      const { data: subscription } = await admin.from("company_subscriptions").select("id").eq("company_id", company_id).eq("status", "active").lte("starts_at", new Date().toISOString()).gt("ends_at", new Date().toISOString()).maybeSingle();
+      if (!subscription) return json({ error: "Langganan Company tidak aktif. Pengelolaan karyawan dalam mode baca-saja." }, 403);
       const { data: membership } = await admin.from("tenant_members").select("id,role,is_active").eq("tenant_id", tenant_id).eq("user_id", actor.id).maybeSingle();
       const { data: permission } = await admin.from("tenant_member_permissions").select("id").eq("tenant_id", tenant_id).eq("user_id", actor.id).eq("permission_key", "employees.manage").eq("granted", true).maybeSingle();
       if (!isOwner && !(membership?.is_active && permission && role === "employee")) return json({ error: "Tidak berwenang mengundang anggota ini" }, 403);
