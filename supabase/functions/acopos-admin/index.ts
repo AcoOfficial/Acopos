@@ -101,11 +101,16 @@ Deno.serve(async (req) => {
       const { data: tenantMember } = await admin.from("tenant_members").select("id").eq("tenant_id", tenant_id).eq("user_id", targetId).maybeSingle();
       if (tenantMember) await admin.from("tenant_members").update({ role, job_title: job_title ?? null, is_active: true }).eq("id", tenantMember.id);
       else await admin.from("tenant_members").insert({ tenant_id, user_id: targetId, role, job_title: job_title ?? null, is_active: true });
+      let allowed: string[] = [];
       if (isOwner) {
-        await admin.from("tenant_member_permissions").delete().eq("tenant_id", tenant_id).eq("user_id", targetId);
-        const allowed = Array.isArray(permissions) ? permissions.filter((p: unknown) => typeof p === "string") : [];
-        if (allowed.length) await admin.from("tenant_member_permissions").insert(allowed.map((permission_key: string) => ({ tenant_id, user_id: targetId, permission_key, granted: true, granted_by: actor.id })));
+        allowed = Array.isArray(permissions) ? permissions.filter((p: unknown) => typeof p === "string") : [];
+      } else {
+        const { data: actorPermissions } = await admin.from("tenant_member_permissions").select("permission_key").eq("tenant_id", tenant_id).eq("user_id", actor.id).eq("granted", true);
+        const grantedToActor = new Set((actorPermissions ?? []).map((p) => p.permission_key));
+        allowed = Array.isArray(permissions) ? permissions.filter((p: unknown): p is string => typeof p === "string" && grantedToActor.has(p)) : [];
       }
+      await admin.from("tenant_member_permissions").delete().eq("tenant_id", tenant_id).eq("user_id", targetId);
+      if (allowed.length) await admin.from("tenant_member_permissions").insert(allowed.map((permission_key: string) => ({ tenant_id, user_id: targetId, permission_key, granted: true, granted_by: actor.id })));
       await admin.from("audit_logs").insert({ company_id, tenant_id, actor_id: actor.id, action: "tenant_member.invited", entity_type: "tenant_member", after_data: { email, role, permissions: isOwner ? permissions : [] } });
       return json({ user_id: targetId, invited: !existing, role, tenant_id });
     }
