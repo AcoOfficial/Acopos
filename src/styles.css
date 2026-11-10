@@ -113,3 +113,6 @@
 .queue-current span,.queue-next span{font-size:18px;font-weight:700}
 .queue-current small,.queue-next small{color:#bdcada}
 .queue-empty{grid-column:1/-1;text-align:center;padding:80px 20px;color:#bdcada;font-size:22px}
+
+.self-order-qr{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px;border:1px solid #e9edf2;border-radius:10px;background:#fff;width:max-content}
+.self-order-qr small{font-size:10px;color:#78869a}
