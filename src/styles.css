@@ -100,3 +100,16 @@
  .cashier-receipt p{font-size:11px;margin:6px 0}
  .cashier-receipt hr{border:0;border-top:1px dashed #333;margin:10px 0}
 }
+
+.queue-display-screen{min-height:100vh;background:#101f32;color:#fff;padding:clamp(20px,5vw,60px)}
+.queue-display-screen .display-head{max-width:1200px;margin:0 auto;border-bottom:1px solid #344457;padding-bottom:20px}
+.queue-display-screen .display-head h2{font-size:22px;margin:0}
+.queue-display-screen>h1{max-width:1200px;margin:34px auto 20px;font-size:clamp(28px,5vw,54px)}
+.queue-display-grid{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.queue-current,.queue-next{border:1px solid #3a5068;border-radius:16px;padding:26px;display:flex;flex-direction:column;gap:12px;background:#1c3047}
+.queue-current{background:#294b6c;border-color:#6688a8}
+.queue-current b{font-size:clamp(38px,6vw,68px)}
+.queue-next b{font-size:clamp(30px,4vw,48px)}
+.queue-current span,.queue-next span{font-size:18px;font-weight:700}
+.queue-current small,.queue-next small{color:#bdcada}
+.queue-empty{grid-column:1/-1;text-align:center;padding:80px 20px;color:#bdcada;font-size:22px}
