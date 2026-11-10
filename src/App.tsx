@@ -36,6 +36,7 @@ function App() {
   const [active, setActive] = useState("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [platformRole, setPlatformRole] = useState<string | null>(null);
+  const [accountStatus, setAccountStatus] = useState<string>("active");
   const [roleReady, setRoleReady] = useState(false);
   const [tenantOptions, setTenantOptions] = useState<{id:string;name:string;company_id:string;status:string}[]>([]);
   const [activeTenantId, setActiveTenantId] = useState("");
@@ -50,9 +51,9 @@ function App() {
   useEffect(() => {
     let alive = true;
     async function loadRole() {
-      if (!session || !supabase) { setPlatformRole(null); setRoleReady(true); return; }
+      if (!session || !supabase) { setPlatformRole(null); setAccountStatus("active"); setRoleReady(true); return; }
       setRoleReady(false);
-      const { data, error } = await supabase.from("profiles").select("platform_role").eq("id", session.user.id).maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("platform_role,account_status").eq("id", session.user.id).maybeSingle();
       if (!alive) return;
       setPlatformRole(error ? null : (data?.platform_role ?? "none"));
       setRoleReady(true);
@@ -107,6 +108,7 @@ function App() {
   </main>;
 
   if (session && !roleReady) return <div className="boot-screen"><div className="brand-mark">a</div><span>Memeriksa hak akses…</span></div>;
+  if (session && accountStatus !== "active") return <main className="login-shell"><section className="login-panel"><div className="login-card"><div className="eyebrow">AKUN DINONAKTIFKAN</div><h2>Akses akun dibatasi</h2><p className="muted">Akun ini tidak memiliki akses operasional saat ini. Hubungi Super Admin atau Joeclyn Support.</p><button className="primary-btn" onClick={signOut}>Keluar</button></div></section></main>;
   if (session && platformRole === "super_admin") return <SuperAdminHome email={session.user.email ?? ""} onSignOut={signOut} />;
   if (session && platformRole === "admin_platform") return <AdminPlatformHome email={session.user.email ?? ""} onSignOut={signOut} />;
 
