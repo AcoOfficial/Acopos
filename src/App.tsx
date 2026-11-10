@@ -107,61 +107,113 @@ function ModulePage({id,title,userId}:{id:string;title:string;userId:string}) {
 export default App;
 
 function SuperAdminHome({email,onSignOut}:{email:string;onSignOut:()=>void}) {
-  const [counts,setCounts] = useState({companies:0,tenants:0,admins:0,packages:0});
-  const [loading,setLoading] = useState(true);
-  const [error,setError] = useState("");
-  useEffect(() => {
-    let alive = true;
-    async function load() {
-      if (!supabase) return;
-      setLoading(true); setError("");
-      const tables = ["companies","tenants","profiles","packages"] as const;
-      const results = await Promise.all(tables.map(table => supabase!.from(table).select("*",{count:"exact",head:true})));
-      if (!alive) return;
-      const failed = results.find(r => r.error);
-      if (failed?.error) setError("Sebagian ringkasan belum dapat dibaca. Periksa kebijakan akses database.");
-      setCounts({companies:results[0].count ?? 0,tenants:results[1].count ?? 0,admins:results[2].count ?? 0,packages:results[3].count ?? 0});
+  const [page,setPage]=useState("Ringkasan");
+  const [counts,setCounts]=useState({companies:0,tenants:0,admins:0,packages:0});
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let alive=true;
+    async function load(){
+      if(!supabase)return;
+      const tables=["companies","tenants","profiles","packages"] as const;
+      const results=await Promise.all(tables.map(table=>supabase!.from(table).select("*",{count:"exact",head:true})));
+      if(!alive)return;
+      if(results.some(r=>r.error))setError("Sebagian ringkasan belum dapat dibaca. Periksa kebijakan akses database.");
+      setCounts({companies:results[0].count??0,tenants:results[1].count??0,admins:results[2].count??0,packages:results[3].count??0});
       setLoading(false);
     }
-    void load();
-    return () => { alive = false; };
+    void load();return()=>{alive=false;};
   },[]);
-  const cards = [
+  const cards=[
     {label:"Company terdaftar",value:counts.companies,icon:Building2},
     {label:"Tenant terdaftar",value:counts.tenants,icon:Store},
     {label:"Akun profil",value:counts.admins,icon:Users},
     {label:"Paket berlangganan",value:counts.packages,icon:Wallet},
   ];
-  const areas = [
-    ["Manajemen Company","Pantau perusahaan pelanggan, status akun, dan pemilik Company."],
-    ["Manajemen Tenant","Lihat seluruh Tenant dan relasinya dengan Company."],
-    ["Admin Platform","Kelola administrator platform dan ruang kewenangannya."],
-    ["Paket & Langganan","Atur paket, harga, kuota Tenant, dan masa berlangganan."],
-    ["Kode Aktivasi","Kelola kode aktivasi untuk pendaftaran Owner."],
-    ["Audit Platform","Telusuri perubahan konfigurasi dan aktivitas penting."],
-  ];
+  const navItems=["Ringkasan","Company","Tenant","Admin Platform","Paket & Langganan","Langganan Company","Kode Aktivasi","Audit Platform"];
+  const descriptions:Record<string,string>={
+    Company:"Daftar Company pelanggan. Akses ini tidak membuka rincian transaksi pelanggan.",
+    Tenant:"Daftar Tenant dan Company induknya.",
+    "Admin Platform":"Akun administrator platform dan status akunnya.",
+    "Langganan Company":"Status langganan per Company, masa aktif, dan kuota Tenant.",
+    "Audit Platform":"Jejak aktivitas platform dan perubahan administrasi.",
+  };
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand-lockup side-brand"><div className="brand-mark">a</div><span>aco<span>Pos</span></span></div>
       <div className="workspace-switch"><div className="workspace-icon"><ShieldCheck size={18}/></div><div><b>Platform Control</b><small>Super Admin</small></div></div>
-      <nav className="side-nav">
-        <div className="nav-group"><div className="nav-label">PENGELOLAAN PLATFORM</div>
-          {["Ringkasan","Company","Tenant","Admin Platform","Paket & Langganan","Kode Aktivasi","Audit Platform"].map((item,i)=><div className={i===0?"nav-item active":"nav-item"} key={item}><span>{item}</span></div>)}
-        </div>
-      </nav>
+      <nav className="side-nav"><div className="nav-group"><div className="nav-label">PENGELOLAAN PLATFORM</div>
+        {navItems.map(item=><button key={item} className={"nav-item "+(page===item?"active":"")} onClick={()=>setPage(item)}><span>{item}</span></button>)}
+      </div></nav>
       <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={17}/></div><div><b>Joeclyn Support</b><small>Bantuan platform</small></div></div><button className="profile-row" onClick={onSignOut}><div className="avatar">{email.slice(0,1).toUpperCase()}</div><div className="profile-text"><b>{email}</b><small>Keluar dari akun</small></div><LogOut size={16}/></button></div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><div className="breadcrumbs">Platform Control <span>/</span> <b>Ringkasan</b></div><div className="topbar-actions"><span className="eyebrow">SUPER ADMIN</span><div className="top-avatar">{email.slice(0,1).toUpperCase()}</div></div></header>
+      <header className="topbar"><div className="breadcrumbs">Platform Control <span>/</span> <b>{page}</b></div><div className="topbar-actions"><span className="eyebrow">SUPER ADMIN</span><div className="top-avatar">{email.slice(0,1).toUpperCase()}</div></div></header>
       <div className="page-content">
-        <div className="page-heading"><div><div className="eyebrow">PUSAT KENDALI ACOPOS</div><h1>Platform Overview</h1><p>Pengelolaan ekosistem Company, Tenant, akun, dan langganan acoPos.</p></div><span className="module-state"><ShieldCheck size={16}/> Akses Super Admin</span></div>
-        <div className="stats-grid">{cards.map(card=><article className="stat-card" key={card.label}><div className="stat-top"><span>{card.label}</span><div className="stat-icon"><card.icon size={18}/></div></div><strong>{loading?"…":card.value.toLocaleString("id-ID")}</strong><small>Data database saat ini</small></article>)}</div>
+        <div className="page-heading"><div><div className="eyebrow">PUSAT KENDALI ACOPOS</div><h1>{page==="Ringkasan"?"Platform Overview":page}</h1><p>{descriptions[page]??"Pengelolaan ekosistem Company, Tenant, akun, dan langganan acoPos."}</p></div><span className="module-state"><ShieldCheck size={16}/> Akses Super Admin</span></div>
+        {page==="Ringkasan"&&<>
+          <div className="stats-grid">{cards.map(card=><article className="stat-card" key={card.label}><div className="stat-top"><span>{card.label}</span><div className="stat-icon"><card.icon size={18}/></div></div><strong>{loading?"…":card.value.toLocaleString("id-ID")}</strong><small>Data database saat ini</small></article>)}</div>
+          <section className="panel"><div className="panel-heading"><div><h3>Area kendali platform</h3><p>Pilih modul administrasi di navigasi sebelah kiri.</p></div></div><div className="stats-grid">{navItems.slice(1).map(title=><button className="stat-card" key={title} onClick={()=>setPage(title)}><strong style={{fontSize:16}}>{title}</strong><small>{descriptions[title]??"Konfigurasi dan administrasi platform acoPos."}</small></button>)}</div></section>
+          <div className="notice-panel"><div className="notice-icon"><ShieldCheck size={19}/></div><div><b>Anda masuk sebagai Super Admin</b><p>Panel platform terpisah dari Workspace Tenant. Data transaksi pelanggan tetap dibatasi sesuai prinsip akses minimum.</p></div><CheckCircle2 size={18}/></div>
+        </>}
+        {page==="Company"&&<PlatformTable table="companies" title="Company terdaftar" columns={["name","slug","status","owner_user_id","created_at"]}/>}
+        {page==="Tenant"&&<PlatformTable table="tenants" title="Tenant terdaftar" columns={["name","slug","status","company_id","created_at"]}/>}
+        {page==="Admin Platform"&&<PlatformTable table="profiles" title="Akun Admin Platform" columns={["display_name","platform_role","account_status","created_at"]} filterAdmin/>}
+        {page==="Paket & Langganan"&&<PackagesManager/>}
+        {page==="Langganan Company"&&<PlatformTable table="company_subscriptions" title="Langganan Company" columns={["company_id","package_id","status","starts_at","ends_at","tenant_quota_snapshot"]}/>}
+        {page==="Audit Platform"&&<PlatformTable table="audit_logs" title="Audit platform" columns={["action","entity_type","entity_id","actor_id","created_at"]}/>}
+        {page==="Kode Aktivasi"&&<section className="panel"><h3>Manajemen Kode Aktivasi</h3><p>Kode aktivasi disimpan dalam bentuk hash dan tidak dapat dibaca kembali. Pembuatan serta penukaran harus melalui fungsi server tepercaya; akses langsung dari browser sengaja ditutup.</p><div className="module-state"><ShieldCheck size={16}/> Endpoint aman penerbitan/penukaran kode masih perlu diselesaikan.</div></section>}
         {error&&<div className="error-note">{error}</div>}
-        <section className="panel"><div className="panel-heading"><div><h3>Area kendali platform</h3><p>Modul administrasi tingkat platform</p></div></div><div className="stats-grid">{areas.map(([title,description])=><article className="stat-card" key={title}><strong style={{fontSize:16}}>{title}</strong><small>{description}</small></article>)}</div></section>
-        <div className="notice-panel"><div className="notice-icon"><ShieldCheck size={19}/></div><div><b>Anda masuk sebagai Super Admin</b><p>Panel ini terpisah dari Workspace Tenant. Pengelolaan lintas Company hanya tersedia melalui kewenangan platform dan tetap dicatat pada audit log.</p></div><CheckCircle2 size={18}/></div>
       </div>
     </main>
   </div>;
+}
+
+function PlatformTable({table,title,columns,filterAdmin=false}:{table:string;title:string;columns:string[];filterAdmin?:boolean}) {
+  const [rows,setRows]=useState<Record<string,any>[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let alive=true;
+    async function load(){
+      if(!supabase)return;
+      let query=supabase.from(table).select(columns.join(",")).order("created_at",{ascending:false}).limit(100);
+      if(filterAdmin)query=query.eq("platform_role","admin_platform");
+      const {data,error}=await query;
+      if(!alive)return;
+      if(error)setError(error.message);
+      setRows((data??[]) as Record<string,any>[]);setLoading(false);
+    }
+    void load();return()=>{alive=false;};
+  },[table,columns.join(","),filterAdmin]);
+  return <section className="panel"><div className="panel-heading"><div><h3>{title}</h3><p>Maksimal 100 data terbaru.</p></div></div>{error&&<div className="error-note">{error}</div>}<div className="table-wrap"><table><thead><tr>{columns.map(col=><th key={col}>{col.replaceAll("_"," ")}</th>)}</tr></thead><tbody>{loading?<tr><td colSpan={columns.length}>Memuat data…</td></tr>:rows.map((row,i)=><tr key={row.id??i}>{columns.map(col=><td key={col}>{row[col]===null?"—":String(row[col]??"—")}</td>)}</tr>)}{!loading&&rows.length===0&&<tr><td colSpan={columns.length}>Belum ada data.</td></tr>}</tbody></table></div></section>;
+}
+
+function PackagesManager() {
+  const [rows,setRows]=useState<any[]>([]);
+  const [name,setName]=useState("");
+  const [description,setDescription]=useState("");
+  const [price,setPrice]=useState("0");
+  const [duration,setDuration]=useState("30");
+  const [quota,setQuota]=useState("1");
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+  async function load(){if(!supabase)return;const {data,error}=await supabase.from("packages").select("id,name,description,price,duration_days,tenant_quota,is_active").order("created_at",{ascending:false});if(error)setError(error.message);setRows(data??[]);}
+  useEffect(()=>{void load();},[]);
+  async function create(e:FormEvent){
+    e.preventDefault();if(!supabase)return;setBusy(true);setError("");setMessage("");
+    const {error}=await supabase.from("packages").insert({name:name.trim(),description:description.trim()||null,price:Number(price),duration_days:Number(duration),tenant_quota:Number(quota),features:{},is_active:true});
+    if(error)setError(error.message);else{setMessage("Paket berhasil dibuat.");setName("");setDescription("");setPrice("0");await load();}
+    setBusy(false);
+  }
+  async function toggle(row:any){
+    if(!supabase)return;setBusy(true);setError("");const {error}=await supabase.from("packages").update({is_active:!row.is_active}).eq("id",row.id);if(error)setError(error.message);else await load();setBusy(false);
+  }
+  return <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h3>Buat paket langganan</h3><p>Harga dalam Rupiah. Durasi dan kuota berlaku per Company.</p></div></div>
+    <form className="login-card" onSubmit={create}><label>Nama paket</label><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Contoh: Basic"/><label>Deskripsi</label><input value={description} onChange={e=>setDescription(e.target.value)}/><label>Harga (IDR)</label><input type="number" min="0" required value={price} onChange={e=>setPrice(e.target.value)}/><label>Durasi (hari)</label><input type="number" min="1" required value={duration} onChange={e=>setDuration(e.target.value)}/><label>Kuota Tenant</label><input type="number" min="1" required value={quota} onChange={e=>setQuota(e.target.value)}/><button className="primary-btn" disabled={busy}>{busy?"Menyimpan…":"Simpan Paket"}</button></form>
+    {message&&<div className="notice-panel">{message}</div>}{error&&<div className="error-note">{error}</div>}
+  </section><section className="panel"><div className="panel-heading"><div><h3>Daftar paket</h3><p>Nonaktifkan paket agar tidak ditawarkan untuk pembelian baru.</p></div></div><div className="table-wrap"><table><thead><tr><th>Paket</th><th>Harga</th><th>Durasi</th><th>Tenant</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><td>{row.name}</td><td>{Number(row.price).toLocaleString("id-ID")}</td><td>{row.duration_days} hari</td><td>{row.tenant_quota}</td><td>{row.is_active?"Aktif":"Nonaktif"}</td><td><button className="text-btn" disabled={busy} onClick={()=>void toggle(row)}>{row.is_active?"Nonaktifkan":"Aktifkan"}</button></td></tr>)}{rows.length===0&&<tr><td colSpan={6}>Belum ada paket.</td></tr>}</tbody></table></div></section></div>;
 }
 
 
