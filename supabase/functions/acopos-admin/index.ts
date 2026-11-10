@@ -37,6 +37,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const action = String(body.action ?? "");
 
+    if (action === "list_activation_codes") {
+      if (profile.platform_role !== "super_admin") return json({ error: "Super Admin only" }, 403);
+      const { data, error } = await admin.from("activation_codes").select("id,status,expires_at,redeemed_by,redeemed_at,created_at").order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return json({ codes: data ?? [] });
+    }
+
     if (action === "create_activation_code") {
       if (profile.platform_role !== "super_admin") return json({ error: "Super Admin only" }, 403);
       const code = "ACO-" + crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
